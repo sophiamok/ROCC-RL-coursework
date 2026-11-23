@@ -1,0 +1,32 @@
+{
+  "run_id": "fig2_seed0_ep20",
+  "seed": 0,
+  "episodes": 20,
+  "sampling_minutes": 5,
+  "timesteps_per_episode": 288,
+  "discount_gamma": 0.9,
+  "layer_sizes": [
+    2,
+    20,
+    20,
+    4
+  ],
+  "param_file": "ROCC/chemostat_env/parameter_files/double_aux.yaml",
+  "targets_cells_per_L": [
+    20000000000.0,
+    30000000000.0
+  ],
+  "theoretical_max_return": 28.8,
+  "final_return": 27.507176354256146,
+  "best_return": 27.57161220519263,
+  "total_seconds": 5862.5,
+  "mean_episode_seconds": 293.1,
+  "git_commit": "9cc74af37657b0561cd62d1c8421403d60d88c15",
+  "git_dirty": true,
+  "python": "3.7.12",
+  "tensorflow": "1.13.1",
+  "numpy": "1.16.6",
+  "platform": "Linux-6.6.159+-x86_64-with-debian-trixie-sid",
+  "cpu": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+  "cpu_count": 2
+}
