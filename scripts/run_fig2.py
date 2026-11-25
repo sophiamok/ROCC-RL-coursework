@@ -67,6 +67,9 @@ def main():
     ap.add_argument('--episodes', type=int, default=20)
     ap.add_argument('--sampling-minutes', type=int, default=5)
     ap.add_argument('--out', default=os.path.join(REPO, 'results', 'raw'))
+    ap.add_argument('--skip-eval', action='store_true',
+                    help='omit the greedy evaluation episode, to test whether it '
+                         'perturbs training')
     args = ap.parse_args()
 
     run_id = 'fig2_seed{}_ep{}'.format(args.seed, args.episodes)
@@ -102,36 +105,41 @@ def main():
 
         # Greedy evaluation of the policy as it currently stands.
         # get_action() draws from np.random on every step whatever the explore
-        # rate, so the RNG state is saved and restored around this call. Training
-        # is therefore bit-identical to a run with no evaluation, and the two
-        # protocols stay directly comparable.
-        t_ev = time.time()
-        rng_state = np.random.get_state()
-        n_values = len(agent.values)
-        env.reset()
-        eval_trajectory, eval_return = agent.run_episode(
-            env, 0.0, tmax, train=False, remember=False)
-        agent.values = agent.values[:n_values]
-        np.random.set_state(rng_state)
-        eval_seconds.append(time.time() - t_ev)
+        # rate, so the RNG state is saved and restored around this call. The
+        # intent is that training is unaffected; --skip-eval exists to test that.
+        if not args.skip_eval:
+            t_ev = time.time()
+            rng_state = np.random.get_state()
+            n_values = len(agent.values)
+            env.reset()
+            eval_trajectory, eval_return = agent.run_episode(
+                env, 0.0, tmax, train=False, remember=False)
+            agent.values = agent.values[:n_values]
+            np.random.set_state(rng_state)
+            eval_seconds.append(time.time() - t_ev)
+            eval_returns.append(eval_return)
 
         returns.append(ep_return)
-        eval_returns.append(eval_return)
         explore_rates.append(explore_rate)
-        print('episode {:3d}  explore {:.4f}  train {:8.3f}  greedy {:8.3f}  '
-              '{:6.1f}s +{:4.1f}s'.format(
-                  ep, explore_rate, ep_return, eval_return,
-                  episode_seconds[-1], eval_seconds[-1]), flush=True)
+        if args.skip_eval:
+            print('episode {:3d}  explore {:.4f}  train {:8.3f}  {:6.1f}s'.format(
+                ep, explore_rate, ep_return, episode_seconds[-1]), flush=True)
+        else:
+            print('episode {:3d}  explore {:.4f}  train {:8.3f}  greedy {:8.3f}  '
+                  '{:6.1f}s +{:4.1f}s'.format(
+                      ep, explore_rate, ep_return, eval_returns[-1],
+                      episode_seconds[-1], eval_seconds[-1]), flush=True)
 
     total_seconds = time.time() - t_start
 
     np.save(os.path.join(out_dir, 'returns.npy'), np.array(returns))
-    np.save(os.path.join(out_dir, 'eval_returns.npy'), np.array(eval_returns))
+    if eval_returns:
+        np.save(os.path.join(out_dir, 'eval_returns.npy'), np.array(eval_returns))
+        np.save(os.path.join(out_dir, 'eval_seconds.npy'), np.array(eval_seconds))
+        np.save(os.path.join(out_dir, 'final_eval_trajectory.npy'), np.array(eval_trajectory))
     np.save(os.path.join(out_dir, 'explore_rates.npy'), np.array(explore_rates))
     np.save(os.path.join(out_dir, 'episode_seconds.npy'), np.array(episode_seconds))
-    np.save(os.path.join(out_dir, 'eval_seconds.npy'), np.array(eval_seconds))
     np.save(os.path.join(out_dir, 'final_trajectory.npy'), np.array(trajectory))
-    np.save(os.path.join(out_dir, 'final_eval_trajectory.npy'), np.array(eval_trajectory))
     agent.save_network(out_dir)
 
     config = {
@@ -147,11 +155,12 @@ def main():
         'theoretical_max_return': round(tmax * 0.1, 3),
         'final_return': returns[-1],
         'best_return': max(returns),
-        'final_eval_return': eval_returns[-1],
-        'best_eval_return': max(eval_returns),
-        'mean_eval_return_last5': float(np.mean(eval_returns[-5:])),
-        'eval_protocol': 'greedy episode after each training episode, '
-                         'train=False, remember=False, RNG state restored',
+        'final_eval_return': eval_returns[-1] if eval_returns else None,
+        'best_eval_return': max(eval_returns) if eval_returns else None,
+        'mean_eval_return_last5': float(np.mean(eval_returns[-5:])) if eval_returns else None,
+        'eval_protocol': ('none (--skip-eval)' if args.skip_eval else
+                          'greedy episode after each training episode, '
+                          'train=False, remember=False, RNG state restored'),
         'total_seconds': round(total_seconds, 1),
         'mean_episode_seconds': round(float(np.mean(episode_seconds)), 1),
         'git_commit': git_commit(),
@@ -167,10 +176,14 @@ def main():
         json.dump(config, f, indent=2)
 
     print('\nwrote {}'.format(out_dir))
-    print('final training return {:.3f}, final greedy return {:.3f}, of {:.1f} max'.format(
-        returns[-1], eval_returns[-1], config['theoretical_max_return']))
-    print('{:.1f} min total, of which {:.1f} min evaluation'.format(
-        total_seconds / 60, sum(eval_seconds) / 60))
+    if eval_returns:
+        print('final training return {:.3f}, final greedy return {:.3f}, of {:.1f} max'.format(
+            returns[-1], eval_returns[-1], config['theoretical_max_return']))
+        print('{:.1f} min total, of which {:.1f} min evaluation'.format(
+            total_seconds / 60, sum(eval_seconds) / 60))
+    else:
+        print('final training return {:.3f} of {:.1f} max, {:.1f} min total'.format(
+            returns[-1], config['theoretical_max_return'], total_seconds / 60))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,77 @@
+{
+  "run_id": "fig4_online_seed0",
+  "experiment": "online NFQ (Algorithm 3), Fig 4 + S5",
+  "seed": 0,
+  "n_envs": 5,
+  "sampling_minutes": 5,
+  "train_minutes": 1440,
+  "train_steps": 288,
+  "hold_minutes": 310,
+  "hold_steps": 62,
+  "update_every_steps": 10,
+  "n_updates": 29,
+  "discount_gamma": 0.9,
+  "layer_sizes": [
+    2,
+    20,
+    20,
+    4
+  ],
+  "param_file": "ROCC/chemostat_env/parameter_files/double_aux.yaml",
+  "yields_auxotrophic": [
+    480000.0,
+    480000.0
+  ],
+  "yields_carbon": [
+    520000.0,
+    520000.0
+  ],
+  "targets_cells_per_L": [
+    20000000000.0,
+    30000000000.0
+  ],
+  "max_reward_per_step": 0.1,
+  "chunks_terminated_early_per_env": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "mean_reward_per_step_final_update": 0.09333695843011901,
+  "mean_reward_per_step_hold": 0.09070685565378227,
+  "sd_reward_per_step_hold": 0.00015694280881985235,
+  "mean_final_populations_1e9": [
+    [
+      20.766,
+      28.527
+    ],
+    [
+      20.764,
+      28.582
+    ],
+    [
+      20.765,
+      28.492
+    ],
+    [
+      20.786,
+      28.537
+    ],
+    [
+      20.718,
+      28.549
+    ]
+  ],
+  "train_seconds": 2627.5,
+  "hold_seconds": 3.6,
+  "total_seconds": 2631.0,
+  "git_commit": "8c3ee6989df8d59a354e59ac98bf70d8fbd395b2",
+  "git_dirty": true,
+  "python": "3.7.12",
+  "tensorflow": "1.13.1",
+  "numpy": "1.16.6",
+  "platform": "Linux-6.6.159+-x86_64-with-debian-trixie-sid",
+  "cpu": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+  "cpu_count": 2
+}
