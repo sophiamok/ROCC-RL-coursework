@@ -6,6 +6,10 @@ that produced it is written into the output directory.
 
     python scripts/run_fig2.py --seed 0 --episodes 20 --out results/raw
 
+After each training episode a greedy evaluation episode is run with no learning
+and no memory update, so policy quality can be read separately from the training
+return, which is inflated or deflated by whatever exploration was still active.
+
 Original experiment: 20 agents x 30 episodes, mean final return 27.4 (SD 0.33),
 theoretical maximum 28.8.
 """
@@ -84,8 +88,9 @@ def main():
         seed=args.seed,
     )
 
-    returns, explore_rates, episode_seconds = [], [], []
-    trajectory = None
+    returns, eval_returns, explore_rates = [], [], []
+    episode_seconds, eval_seconds = [], []
+    trajectory = eval_trajectory = None
     t_start = time.time()
 
     for ep in range(args.episodes):
@@ -93,19 +98,40 @@ def main():
         explore_rate = agent.get_rate(ep, 0, 1, args.episodes / 10)
         env.reset()
         trajectory, ep_return = agent.run_episode(env, explore_rate, tmax)
+        episode_seconds.append(time.time() - t_ep)
+
+        # Greedy evaluation of the policy as it currently stands.
+        # get_action() draws from np.random on every step whatever the explore
+        # rate, so the RNG state is saved and restored around this call. Training
+        # is therefore bit-identical to a run with no evaluation, and the two
+        # protocols stay directly comparable.
+        t_ev = time.time()
+        rng_state = np.random.get_state()
+        n_values = len(agent.values)
+        env.reset()
+        eval_trajectory, eval_return = agent.run_episode(
+            env, 0.0, tmax, train=False, remember=False)
+        agent.values = agent.values[:n_values]
+        np.random.set_state(rng_state)
+        eval_seconds.append(time.time() - t_ev)
 
         returns.append(ep_return)
+        eval_returns.append(eval_return)
         explore_rates.append(explore_rate)
-        episode_seconds.append(time.time() - t_ep)
-        print('episode {:3d}  explore {:.4f}  return {:8.3f}  {:6.1f}s'.format(
-            ep, explore_rate, ep_return, episode_seconds[-1]), flush=True)
+        print('episode {:3d}  explore {:.4f}  train {:8.3f}  greedy {:8.3f}  '
+              '{:6.1f}s +{:4.1f}s'.format(
+                  ep, explore_rate, ep_return, eval_return,
+                  episode_seconds[-1], eval_seconds[-1]), flush=True)
 
     total_seconds = time.time() - t_start
 
     np.save(os.path.join(out_dir, 'returns.npy'), np.array(returns))
+    np.save(os.path.join(out_dir, 'eval_returns.npy'), np.array(eval_returns))
     np.save(os.path.join(out_dir, 'explore_rates.npy'), np.array(explore_rates))
     np.save(os.path.join(out_dir, 'episode_seconds.npy'), np.array(episode_seconds))
+    np.save(os.path.join(out_dir, 'eval_seconds.npy'), np.array(eval_seconds))
     np.save(os.path.join(out_dir, 'final_trajectory.npy'), np.array(trajectory))
+    np.save(os.path.join(out_dir, 'final_eval_trajectory.npy'), np.array(eval_trajectory))
     agent.save_network(out_dir)
 
     config = {
@@ -121,6 +147,11 @@ def main():
         'theoretical_max_return': round(tmax * 0.1, 3),
         'final_return': returns[-1],
         'best_return': max(returns),
+        'final_eval_return': eval_returns[-1],
+        'best_eval_return': max(eval_returns),
+        'mean_eval_return_last5': float(np.mean(eval_returns[-5:])),
+        'eval_protocol': 'greedy episode after each training episode, '
+                         'train=False, remember=False, RNG state restored',
         'total_seconds': round(total_seconds, 1),
         'mean_episode_seconds': round(float(np.mean(episode_seconds)), 1),
         'git_commit': git_commit(),
@@ -136,8 +167,10 @@ def main():
         json.dump(config, f, indent=2)
 
     print('\nwrote {}'.format(out_dir))
-    print('final return {:.3f} of {:.1f} max, {:.1f} min total'.format(
-        returns[-1], config['theoretical_max_return'], total_seconds / 60))
+    print('final training return {:.3f}, final greedy return {:.3f}, of {:.1f} max'.format(
+        returns[-1], eval_returns[-1], config['theoretical_max_return']))
+    print('{:.1f} min total, of which {:.1f} min evaluation'.format(
+        total_seconds / 60, sum(eval_seconds) / 60))
 
 
 if __name__ == '__main__':
